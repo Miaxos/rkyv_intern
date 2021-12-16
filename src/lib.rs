@@ -8,12 +8,12 @@ mod string;
 use core::{alloc::Layout, borrow::Borrow, fmt, hash::Hash, ptr::NonNull};
 use rkyv::{
     ser::{ScratchSpace, Serializer, SharedSerializeRegistry},
-    Fallible,
-    SerializeUnsized,
+    Fallible, SerializeUnsized,
 };
 
 #[cfg(feature = "alloc")]
 pub use self::alloc::*;
+pub use self::impls::InternedRkyvString;
 pub use string::*;
 
 /// A wrapper that pools strings to reduce memory usage.
@@ -126,13 +126,15 @@ impl<S: Fallible, T: Fallible> Fallible for InternSerializerAdapter<S, T> {
 impl<S: ScratchSpace, T: Fallible> ScratchSpace for InternSerializerAdapter<S, T> {
     #[inline]
     unsafe fn push_scratch(&mut self, layout: Layout) -> Result<NonNull<[u8]>, Self::Error> {
-        self.serializer.push_scratch(layout)
+        self.serializer
+            .push_scratch(layout)
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 
     #[inline]
     unsafe fn pop_scratch(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), Self::Error> {
-        self.serializer.pop_scratch(ptr, layout)
+        self.serializer
+            .pop_scratch(ptr, layout)
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 }
@@ -145,42 +147,59 @@ impl<S: Serializer, T: Fallible> Serializer for InternSerializerAdapter<S, T> {
 
     #[inline]
     fn write(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.serializer.write(bytes)
+        self.serializer
+            .write(bytes)
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 
     #[inline]
     fn pad(&mut self, padding: usize) -> Result<(), Self::Error> {
-        self.serializer.pad(padding)
+        self.serializer
+            .pad(padding)
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 
     #[inline]
     fn align(&mut self, align: usize) -> Result<usize, Self::Error> {
-        self.serializer.align(align)
+        self.serializer
+            .align(align)
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 
     #[inline]
     fn align_for<U>(&mut self) -> Result<usize, Self::Error> {
-        self.serializer.align_for::<U>()
+        self.serializer
+            .align_for::<U>()
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 
     #[inline]
-    unsafe fn resolve_aligned<U: rkyv::Archive + ?Sized>(&mut self, value: &U, resolver: U::Resolver) -> Result<usize, Self::Error> {
-        self.serializer.resolve_aligned(value, resolver)
+    unsafe fn resolve_aligned<U: rkyv::Archive + ?Sized>(
+        &mut self,
+        value: &U,
+        resolver: U::Resolver,
+    ) -> Result<usize, Self::Error> {
+        self.serializer
+            .resolve_aligned(value, resolver)
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 
     #[inline]
-    unsafe fn resolve_unsized_aligned<U: rkyv::ArchiveUnsized + ?Sized>(&mut self, value: &U, to: usize, metadata_resolver: U::MetadataResolver) -> Result<usize, Self::Error> {
-        self.serializer.resolve_unsized_aligned(value, to, metadata_resolver)
+    unsafe fn resolve_unsized_aligned<U: rkyv::ArchiveUnsized + ?Sized>(
+        &mut self,
+        value: &U,
+        to: usize,
+        metadata_resolver: U::MetadataResolver,
+    ) -> Result<usize, Self::Error> {
+        self.serializer
+            .resolve_unsized_aligned(value, to, metadata_resolver)
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 }
 
-impl<S: SharedSerializeRegistry, T: Fallible> SharedSerializeRegistry for InternSerializerAdapter<S, T> {
+impl<S: SharedSerializeRegistry, T: Fallible> SharedSerializeRegistry
+    for InternSerializerAdapter<S, T>
+{
     #[inline]
     fn get_shared_ptr(&mut self, value: *const u8) -> Option<usize> {
         self.serializer.get_shared_ptr(value)
@@ -188,12 +207,15 @@ impl<S: SharedSerializeRegistry, T: Fallible> SharedSerializeRegistry for Intern
 
     #[inline]
     fn add_shared_ptr(&mut self, value: *const u8, pos: usize) -> Result<(), Self::Error> {
-        self.serializer.add_shared_ptr(value, pos)
+        self.serializer
+            .add_shared_ptr(value, pos)
             .map_err(InternSerializerAdapterError::SerializerError)
     }
 }
 
-impl<S: Fallible, T: InternSerializeRegistry<U>, U> InternSerializeRegistry<U> for InternSerializerAdapter<S, T> {
+impl<S: Fallible, T: InternSerializeRegistry<U>, U> InternSerializeRegistry<U>
+    for InternSerializerAdapter<S, T>
+{
     #[inline]
     fn get_interned<Q: Hash + Eq + ?Sized>(&self, value: &Q) -> Option<usize>
     where
@@ -204,7 +226,8 @@ impl<S: Fallible, T: InternSerializeRegistry<U>, U> InternSerializeRegistry<U> f
 
     #[inline]
     fn add_interned(&mut self, value: U, pos: usize) -> Result<(), Self::Error> {
-        self.intern_registry.add_interned(value, pos)
+        self.intern_registry
+            .add_interned(value, pos)
             .map_err(InternSerializerAdapterError::InternError)
     }
 }
@@ -213,16 +236,12 @@ impl<S: Fallible, T: InternSerializeRegistry<U>, U> InternSerializeRegistry<U> f
 mod tests {
     use rkyv::archived_root;
 
-
     #[test]
     fn intern_strings() {
         use crate::{Intern, InternSerializeMap, InternSerializerAdapter};
         use rkyv::{
             ser::{serializers::AllocSerializer, Serializer},
-            Archive,
-            Deserialize,
-            Infallible,
-            Serialize,
+            Archive, Deserialize, Infallible, Serialize,
         };
 
         #[derive(Archive, Serialize, Deserialize, Debug, PartialEq)]
@@ -248,10 +267,8 @@ mod tests {
             });
         }
 
-        type MySerializer = InternSerializerAdapter<
-            AllocSerializer<4096>,
-            InternSerializeMap<String>,
-        >;
+        type MySerializer =
+            InternSerializerAdapter<AllocSerializer<4096>, InternSerializeMap<String>>;
 
         let mut value = Vec::new();
         for i in 0..1000 {
@@ -262,7 +279,8 @@ mod tests {
         }
 
         let mut serializer = MySerializer::default();
-        serializer.serialize_value(&value)
+        serializer
+            .serialize_value(&value)
             .expect("failed to serialize interned strings");
 
         let result = serializer.into_serializer().into_serializer().into_inner();
@@ -271,7 +289,8 @@ mod tests {
         let archived = unsafe { archived_root::<Vec<Log>>(result.as_ref()) };
         assert_eq!(archived, &value);
 
-        let deserialized: Vec<Log> = archived.deserialize(&mut Infallible)
+        let deserialized: Vec<Log> = archived
+            .deserialize(&mut Infallible)
             .expect("failed to deserialized interned strings");
         assert_eq!(deserialized, value);
     }

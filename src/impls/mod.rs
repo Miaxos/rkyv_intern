@@ -2,3 +2,4 @@
 mod alloc;
 
 mod internment;
+pub use internment::InternedRkyvString;

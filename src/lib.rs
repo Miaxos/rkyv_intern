@@ -14,7 +14,7 @@ use rkyv::{
 
 #[cfg(feature = "alloc")]
 pub use self::alloc::*;
-pub use self::impls::InternedRkyvString;
+// pub use self::impls::InternedRkyvString;
 pub use string::*;
 
 /// A wrapper that pools strings to reduce memory usage.

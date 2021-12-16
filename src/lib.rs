@@ -1,3 +1,4 @@
+#![feature(raw_ref_op)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]
